@@ -35,7 +35,7 @@
 
 #include "fbm330.h"
 
-extern volatile uint32_t TMR0_Ticks;
+volatile uint32_t TMR0_Ticks;
 volatile uint32_t fbm330_update_rdy;
 
 static void fbm330_us_delay(uint32_t us);
@@ -171,32 +171,6 @@ static uint8_t fbm330_i2c_readblock(uint8_t reg_addr, uint32_t cnt, uint8_t *reg
 	return status;
 }
 #endif
-
-#ifdef GPIO_I2C
-static uint8_t fbm330_i2c_writeblock(uint8_t reg_addr, uint32_t cnt, const uint8_t *reg_data)
-{
-	/* This is just an example. This function have to
-	   be implemented according to your platform. */
-	int8_t status;
-	uint32_t cnt_write;
-	cnt_write = gpio_i2c_writeBlock(FBM330_I2C_SLAVE_ADDR, reg_addr, \
-	                                cnt, reg_data);
-	status = (cnt_write > 0) ?  0 : -1;
-	return status;
-}
-static uint8_t fbm330_i2c_readblock(uint8_t reg_addr, uint32_t cnt, uint8_t *reg_data)
-{
-	/* This is just an example. This function have to
-	   be implemented according to your platform. */
-	int8_t status;
-	uint32_t cnt_read;
-	cnt_read = gpio_i2c_readBlock(FBM330_I2C_SLAVE_ADDR, reg_addr, \
-	                              cnt, reg_data);
-	status = (cnt_read > 0) ?  0 : -1;
-	return status;
-}
-#endif
-
 /**
  * @brief      { API for fbm330 delay }
  *
@@ -218,6 +192,7 @@ static void fbm330_us_delay(uint32_t us)
 int8_t fbm330_init(void)
 {
 	int32_t err;
+	uint8_t data_buf;
 
 #ifdef SPI
 	fbm330_barom.bus_write = fbm330_spi_writeblock;
@@ -238,7 +213,7 @@ int8_t fbm330_init(void)
 	} else {
 #ifdef DEBUG_FBM330
 		printf("%s:fbm330_chipid_check() passed!\n", __func__);
-#endif//DEBUG_FBM330
+#endif
 	}
 
 	err = fbm330_version_identification(barom);
@@ -248,7 +223,7 @@ int8_t fbm330_init(void)
 	} else {
 #ifdef DEBUG_FBM330
 		printf("%s:fbm330_version_identification() passed!\n", __func__);
-#endif//DEBUG_FBM330
+#endif
 	}
 
 	err = fbm330_read_store_otp_data(barom);
@@ -258,32 +233,50 @@ int8_t fbm330_init(void)
 	} else {
 #ifdef DEBUG_FBM330
 		printf("%s:fbm330_read_store_otp_data() passed!\n", __func__);
-#endif//DEBUG_FBM330
+#endif
 	}
 	err = 0;
 
 	fbm330_set_oversampling_rate(barom, OVERSAMPLING_RATE_DEFAULT);
+	/* Setting the P_CONFIG_REG_GAIN */
+	barom->bus_read(FBM330_P_CONFIG_REG, sizeof(uint8_t), &data_buf);
+	data_buf &= ~(FBM330_P_CONFIG_REG_GAIN_MAK);
+	switch (barom->hw_ver){
+	case hw_ver_a14n:
+		data_buf |= FBM330_P_CONFIG_REG_GAIN_X32;
+		break;
+	case hw_ver_a11k:
+		data_buf |= FBM330_P_CONFIG_REG_GAIN_X16;
+		break;
+	case hw_ver_unknown:
+		break;		
+	}	
+	barom->bus_write(FBM330_P_CONFIG_REG, sizeof(uint8_t), &data_buf);
+#ifdef DEBUG_FBM330
+	printf("%s:Setting of FBM330_P_CONFIG_REG_GAIN: %#x\n", __func__, data_buf & FBM330_P_CONFIG_REG_GAIN_MAK);
+#endif
+
 #ifdef DEBUG_FBM330
 	printf("%s:fbm330_init() succeeded!\n", __func__);
-#endif//DEBUG_FBM330	
+#endif	
 	return err;
 
 err_chip_id_chk:
 #ifdef DEBUG_FBM330
 	printf("%s:fbm330_init() failed!; fbm330_ID:%#x,err:%d\n", __func__, fbm330_barom.chip_id, err);
-#endif//DEBUG_FBM330
+#endif
 	return err;
 
 err_version_identification:
 #ifdef DEBUG_FBM330
 	printf("%s:fbm330_init() failed!; fbm330 version:%#x,err:%d\n", __func__, fbm330_barom.hw_ver, err);
-#endif//DEBUG_FBM330
+#endif
 	return err;
 
 err_read_otp:
 #ifdef DEBUG_FBM330
 	printf("%s:fbm330_init() failed!; fbm330 otp reading failed!,err:%d\n", __func__, err);
-#endif//DEBUG_FBM330
+#endif
 	return err;
 }
 
@@ -370,7 +363,7 @@ static int fbm330_get_raw_temperature(struct fbm330_data *barom)
 
 #ifdef DEBUG_FBM330
 	printf("%s: uncompensated temperature: %d\n", DEVICE_NAME, barom->raw_temperature);
-#endif//DEBUG_FBM330
+#endif
 	return err;
 }
 /**
@@ -411,7 +404,7 @@ static int32_t fbm330_get_raw_pressure(struct fbm330_data *barom)
 
 #ifdef DEBUG_FBM330
 	printf("%s: uncompensated pressure:  %d\n", DEVICE_NAME, barom->raw_pressure);
-#endif//DEBUG_FBM330
+#endif
 
 	return err;
 }
@@ -499,7 +492,7 @@ static int32_t fbm330_read_store_otp_data(struct fbm330_data *barom)
 	printf("%s: C10= %d\n", DEVICE_NAME, cali->C10);
 	printf("%s: C11= %d\n", DEVICE_NAME, cali->C11);
 	printf("%s: C12= %d\n", DEVICE_NAME, cali->C12);
-#endif//DEBUG_FBM330
+#endif
 exit:
 	return status;
 }
@@ -528,7 +521,7 @@ static int fbm330_version_identification(struct fbm330_data *barom)
 	version = ((buf[0] & 0xC0) >> 6) | ((buf[1] & 0x70) >> 2);
 #ifdef DEBUG_FBM330
 	printf("%s: The value of version: %#x\n", __func__, version);
-#endif//DEBUG_FBM330
+#endif
 
 	switch (version) {
 	case hw_ver_a14n:
@@ -536,21 +529,21 @@ static int fbm330_version_identification(struct fbm330_data *barom)
 		err = 0;
 #ifdef DEBUG_FBM330
 		printf("%s: The version of sensor is a14n.\n", __func__);
-#endif//DEBUG_FBM330		
+#endif		
 		break;
 	case hw_ver_a11k:
 		barom->hw_ver = hw_ver_a11k;
 		err = 0;
 #ifdef DEBUG_FBM330
 		printf("%s: The version of sensor is a11k.\n", __func__);
-#endif//DEBUG_FBM330		
+#endif		
 		break;
 	default:
 		barom->hw_ver = hw_ver_unknown;
 		err = -1;
 #ifdef DEBUG_FBM330
 		printf("%s: The version of sensor is unknown.\n", __func__);
-#endif//DEBUG_FBM330
+#endif
 		break;
 	}
 	return err;
@@ -564,7 +557,7 @@ static int32_t fbm330_set_oversampling_rate(struct fbm330_data *barom
 	barom->oversampling_rate = osr_setting;
 #ifdef DEBUG_FBM330
 	printf("Setting of oversampling_rate:%#x\r\n", barom->oversampling_rate);
-#endif//DEBUG_FBM330			
+#endif			
 
 	/* Setting conversion time for pressure measurement */
 	switch (osr_setting) {
@@ -595,7 +588,7 @@ static int32_t fbm330_set_oversampling_rate(struct fbm330_data *barom
 		barom->bus_read(0xA6, sizeof(uint8_t), &data_buf);
 #ifdef DEBUG_FBM330
 		printf("reg_0xA6:%#x\n\r", data_buf);
-#endif//DEBUG_FBM330
+#endif
 		break;
 	}
 	/* Setting covversion time for temperature measurement */
@@ -611,7 +604,7 @@ static int32_t fbm330_chipid_check(struct fbm330_data *barom)
 	err = barom->bus_read(FBM330_CHIP_ID_REG, sizeof(uint8_t), &chip_id_read);
 #ifdef DEBUG_FBM330
 	printf("%s: chip_id reading is %#x \n", __func__, chip_id_read);
-#endif//DEBUG_FBM330
+#endif
 
 	if (chip_id_read != FBM330_CHIP_ID) {
 		err = -1;
@@ -639,14 +632,14 @@ void fbm330_update_data(void)
 	if (t_start_flag == 0 && !fbm330_update_rdy) {
 #ifdef DEBUG_FBM330
 		printf("start t_measurement\r\n");
-#endif//DEBUG_FBM330			
+#endif			
 		fbm330_startMeasure_temp(barom);
 		t_start_flag = 1;
 		tick_last = TMR0_Ticks;
 	} else if ((tick_diff * 1000 > barom->cnvTime_temp ) && (p_start_flag == 0)) {
 #ifdef DEBUG_FBM330
 		printf("start p_measurement\r\n");
-#endif//DEBUG_FBM330			
+#endif			
 		fbm330_get_raw_temperature(barom);
 		fbm330_startMeasure_press(barom);
 		p_start_flag = 1;
@@ -654,7 +647,7 @@ void fbm330_update_data(void)
 	} else if (tick_diff * 1000 > barom->cnvTime_press ) {
 #ifdef DEBUG_FBM330
 		printf("read pressure\r\n");
-#endif//DEBUG_FBM330			
+#endif			
 		fbm330_get_raw_pressure(barom);
 		t_start_flag = 0;
 		p_start_flag = 0;
@@ -667,14 +660,14 @@ void fbm330_update_data(void)
 	printf("tick_current:%d\r\n", tick_current);
 	printf("tick_last:%d\r\n", tick_last);
 	printf("FBM330 is updating %d\r\n", TMR0_Ticks);
-#endif//DEBUG_FBM330		
+#endif		
 	return ;
 }
 /**
  * @brief      { API for calculating real temperature and pressure values.
  *               The results are stored in fbm330_data structure.
  *               "barom->real_temperature" is represented real temperature value.
- *               "barom->real_temperature" is in uint of drgree Celsius.
+ *               "barom->real_temperature" is in uint of 0.01 drgree Celsius.
  *               "barom->real_pressure" is represented real pressure value.
  *               "barom->real_pressure" is in unit of Pa. }
  *
@@ -760,7 +753,7 @@ int fbm330_calculation(struct fbm330_data *barom)
 
 #ifdef DEBUG_FBM330
 	printf("%s: calibrated pressure: %d\n", DEVICE_NAME, RP);
-#endif//DEBUG_FBM330
+#endif
 
 	return 0;
 }

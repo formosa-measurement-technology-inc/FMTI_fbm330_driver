@@ -23,11 +23,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <NUC123.h> //MCU specific header files
-#include "gpio_i2c.h" //MCU specific header files
 
+/* Data bus definition */
 #define I2C
-//#define GPIO_I2C
 //#define SPI
+
 #define DEVICE_NAME     "FBM330"
 #define FBM330_CHIP_ID  0x42
 //#define DEBUG_FBM330  //Enable debug mode
@@ -53,6 +53,17 @@
 #define FBM330_SOFTRESET_REG    0xe0
 #define FBM330_CHIP_ID_REG	  0x6b
 #define FBM330_VERSION_REG	  0xa5
+#define FBM330_P_CONFIG_REG	  0xa6
+#define FBM330_P_CONFIG_REG_GAIN_POS (3)
+#define FBM330_P_CONFIG_REG_GAIN_MAK (7 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X1 (0 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X2 (1 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X4 (2 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X8 (3 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X16 (4 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X32 (5 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X64 (6 << FBM330_P_CONFIG_REG_GAIN_POS)
+#define FBM330_P_CONFIG_REG_GAIN_X128 (7 << FBM330_P_CONFIG_REG_GAIN_POS)
 
 /* CMD list */
 #define FBM330_MEAS_TEMP		        0x2e /* 2.5ms wait for measurement */
@@ -84,6 +95,7 @@
 #define FBM330_SPI_4BYTE 0x60
 #endif
 
+extern volatile uint32_t TMR0_Ticks;
 extern volatile uint32_t fbm330_update_rdy;
 
 struct fbm330_calibration_data {
