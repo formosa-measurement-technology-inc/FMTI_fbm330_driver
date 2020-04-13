@@ -194,18 +194,26 @@ int8_t fbm330_init(void)
 	int32_t err;
 	uint8_t data_buf;
 
+	fbm330_barom.delay_usec = fbm330_us_delay;
+	/* The minimum start up time of fbm330 is 15ms */
+	barom->delay_usec(1000 * 15);
+
 #ifdef SPI
 	fbm330_barom.bus_write = fbm330_spi_writeblock;
 	fbm330_barom.bus_read = fbm330_spi_readblock;
+	/* The default of SPI is in 3 wires mode after power on reset. If 4 wires SPI
+    mode is preffered, the following statements will be needed. */
+    #define SPI_4_WIRES_MODE
+	#ifdef SPI_4_WIRES_MODE
+		/* Set SPI bus as 4 wires mode */
+		data_buf = FBM330_SPI_CTRL_REG_SDO_ACTIVE_EN;
+		barom->bus_write(FBM330_SPI_CTRL_REG, sizeof(uint8_t), &data_buf);
+	#endif
 #else
 	fbm330_barom.bus_write = fbm330_i2c_writeblock;
 	fbm330_barom.bus_read = fbm330_i2c_readblock;
 #endif
-	fbm330_barom.delay_usec = fbm330_us_delay;
-
-	/* The minimum start up time of fbm330 is 15ms */
-	barom->delay_usec(1000 * 15);
-
+	
 	err = fbm330_chipid_check(barom);
 	if (err) {
 		err = -1;
@@ -359,7 +367,7 @@ static int fbm330_get_raw_temperature(struct fbm330_data *barom)
 	uint8_t buf[3] = {0};
 
 	err = barom->bus_read(FBM330_READ_MEAS_REG_U, 3 * sizeof(uint8_t), buf);
-	barom->raw_temperature = (buf[0] * 256 * 256) + (buf[1] * 256) + buf[2];
+	barom->raw_temperature = ((uint32_t)buf[0] << 16) + ((uint32_t)buf[1] << 8) + buf[2];
 
 #ifdef DEBUG_FBM330
 	printf("%s: uncompensated temperature: %d\n", DEVICE_NAME, barom->raw_temperature);
@@ -399,9 +407,8 @@ static int32_t fbm330_get_raw_pressure(struct fbm330_data *barom)
 	uint8_t buf[3] = {0};
 
 	err = barom->bus_read(FBM330_READ_MEAS_REG_U, 3 * sizeof(uint8_t), buf);
-
-	barom->raw_pressure = (buf[0] * 256 * 256) + (buf[1] * 256) + buf[2];
-
+	barom->raw_pressure = ((uint32_t)buf[0] << 16) + ((uint32_t)buf[1] << 8) + buf[2];
+	
 #ifdef DEBUG_FBM330
 	printf("%s: uncompensated pressure:  %d\n", DEVICE_NAME, barom->raw_pressure);
 #endif
