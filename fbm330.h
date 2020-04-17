@@ -31,6 +31,7 @@
 #define DEVICE_NAME     "FBM330"
 #define FBM330_CHIP_ID  0x42
 //#define DEBUG_FBM330  //Enable debug mode
+#define MSG_LOG
 
 /**
  * { I2C 7bit address setting for fbm330 }
